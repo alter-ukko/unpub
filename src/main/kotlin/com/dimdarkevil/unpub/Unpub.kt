@@ -17,13 +17,15 @@ import java.nio.file.Files
 
 object Unpub {
     private val log = LoggerFactory.getLogger(Unpub::class.java)
+    private val serverConfigFile = File(HOME, ".config/unpub/unpub.yaml")
 
     @JvmStatic
     fun main(args: Array<String>) {
         val om = ObjectMapper(YAMLFactory())
             .registerKotlinModule()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        val rootDir = File(HOME, "files/unpub_web")
+        val serverConfig = loadServerConfig(om)
+        val rootDir = File(serverConfig.webRootDir)
         var books = loadBooks(rootDir, om)
         val fileNameMap = URLConnection.getFileNameMap()
         var config = loadConfig(om)
@@ -262,7 +264,7 @@ object Unpub {
         app.get("*") { ctx ->
             log.info("unhandled request for ${ctx.req().requestURI}")
         }
-        app.start(8000)
+        app.start(serverConfig.webServerPort)
     }
 
     private fun loadConfig(om: ObjectMapper): UnpubConfig {
@@ -293,5 +295,23 @@ object Unpub {
 
     private fun saveBooks(books: Collection<BookMetadata>, rootDir: File, om: ObjectMapper) {
         om.writeValue(File(rootDir, "books.yaml"), books)
+    }
+
+    private fun loadServerConfig(om: ObjectMapper): UnpubServerConfig {
+        return if (serverConfigFile.exists()) {
+            om.readValue<UnpubServerConfig>(serverConfigFile)
+        } else {
+            serverConfigFile.parentFile.mkdirs()
+            val serverConfig = UnpubServerConfig(
+                File(HOME, "unpub_web").absolutePath,
+                8000
+            )
+            om.writeValue(serverConfigFile, serverConfig)
+            serverConfig
+        }
+    }
+
+    private fun saveServerConfig(serverConfig: UnpubServerConfig, om: ObjectMapper) {
+        om.writeValue(serverConfigFile, serverConfig)
     }
 }
