@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.23"
+    application
 }
 
 group = "com.dimdarkevil"
@@ -21,6 +22,12 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
 kotlin {
     jvmToolchain(17)
+}
+
+application {
+    mainClass.set("com.dimdarkevil.unpub.Unpub")
+    applicationName = "unpub"
 }

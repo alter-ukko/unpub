@@ -15,7 +15,7 @@ import java.net.URLDecoder
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
-object BulkImport {
+object EpubImport {
     private val multiSpace = Regex("\\_+")
 
     @JvmStatic
@@ -108,6 +108,7 @@ object BulkImport {
                     if (!itemFile.exists()) throw RuntimeException("item file ${itemFile.canonicalPath} does not exist")
                     val jdoc = Jsoup.parse(itemFile)
                     val body = jdoc.body()
+                    // fix anchor links
                     body.getElementsByTag("a").forEach { atag ->
                         val href = atag.attr("href")
                         val hashPos = href.indexOf('#')
@@ -117,6 +118,22 @@ object BulkImport {
                             filenameMap[href]?.let {
                                 atag.attr("href", "#${it.id}")
                             }
+                        }
+                    }
+                    // fix relative images
+                    body.getElementsByTag("img").forEach { itag ->
+                        val src = itag.attr("src")
+                        val startPos = if (src.startsWith("../")) {
+                            3
+                        } else if (src.startsWith("./")) {
+                            2
+                        } else if (src.startsWith("/")) {
+                            1
+                        } else {
+                            0
+                        }
+                        if (startPos > 0) {
+                            itag.attr("src", src.substring(startPos))
                         }
                     }
                     sw.appendLine("<a id=\"$id\"></a>")
@@ -145,7 +162,8 @@ object BulkImport {
         }
     }
 
-    fun unzipEpubFile(f: File, dstRootDir: File) {
+    // returns the root directory where the unzipped epub file was placed
+    fun unzipEpubFile(f: File, dstRootDir: File): File {
         val cleanName = cleanName(f)
         println("-=-= $cleanName")
         val dstDir = File(dstRootDir, cleanName)
@@ -168,6 +186,7 @@ object BulkImport {
                 zipEntry = zis.nextEntry
             }
         }
+        return dstDir
     }
 
     fun cleanName(f: File): String {
@@ -200,23 +219,5 @@ object BulkImport {
         val id: String,
         val fileName: String,
         val mediaType: String,
-    )
-
-    data class BookMetadata(
-        val id: String,
-        var title: String = "",
-        var author: String = "",
-        var description: String = "",
-        var publisher: String = "",
-        var date: String = "",
-        var creators: MutableList<CreatorRec> = mutableListOf(),
-        var subjects: MutableList<String> = mutableListOf(),
-    )
-
-    data class CreatorRec(
-        val name: String,
-        val firstName: String,
-        val lastName: String,
-        val role: String
     )
 }
